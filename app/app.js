@@ -3,94 +3,105 @@ const mysql = require('mysql2');
 require('dotenv').config();
 
 const app = express();
-
 app.use(express.json());
 
-const db = mysql.createPool({
+const connection = mysql.createPool({
     host: process.env.DB_HOST,
+    port: process.env.APP_PORT,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
 });
 
-db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255)
-    )
-`, (err) => {
-    if (err) {
-        console.log(err);
-    } else {
-        console.log('Table users ready');
+const initDatabase = () => {
+    connection.query('SELECT 1', (err) => {
+        if (err) {
+            console.log('Database belum ready, retry 3 detik lagi...', err.message);
+            setTimeout(initDatabase, 3000);
+            return;
+        }
+
+        console.log('Database connected');
+
+        connection.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL
+            )
+        `);
+    });
+};
+
+initDatabase();
+
+app.get('/', (req, res) => {
+    res.send('Backend API Running');
+});
+
+app.get('/users', async (req, res) => {
+    try {
+        const result = await connection.promise().query('SELECT * FROM users');
+        res.json(result[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/users', (req, res) => {
-    db.query('SELECT * FROM users', (err, result) => {
-        if (err) {
-            return res.status(500).json(err);
-        }
-
-        res.json(result);
-    });
-});
-
-app.post('/users', (req, res) => {
+app.post('/users', async (req, res) => {
     const { name } = req.body;
 
-    db.query(
-        'INSERT INTO users (name) VALUES (?)',
-        [name],
-        (err, result) => {
-            if (err) {
-                return res.status(500).json(err);
-            }
+    try {
+        await connection.promise().query(
+            'INSERT INTO users (name) VALUES (?)',
+            [name]
+        );
 
-            res.json({
-                message: 'User ditambahkan'
-            });
-        }
-    );
+        res.status(201).json({
+            message: 'User berhasil ditambahkan'
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.put('/users/:id', (req, res) => {
+app.put('/users/:id', async (req, res) => {
+    const { id } = req.params;
     const { name } = req.body;
 
-    db.query(
-        'UPDATE users SET name=? WHERE id=?',
-        [name, req.params.id],
-        (err, result) => {
-            if (err) {
-                return res.status(500).json(err);
-            }
+    try {
+        await connection.promise().query(
+            'UPDATE users SET name = ? WHERE id = ?',
+            [name, id]
+        );
 
-            res.json({
-                message: 'User diupdate'
-            });
-        }
-    );
+        res.json({
+            message: 'User berhasil diupdate'
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.delete('/users/:id', (req, res) => {
-    db.query(
-        'DELETE FROM users WHERE id=?',
-        [req.params.id],
-        (err, result) => {
-            if (err) {
-                return res.status(500).json(err);
-            }
+app.delete('/users/:id', async (req, res) => {
+    const { id } = req.params;
 
-            res.json({
-                message: 'User dihapus'
-            });
-        }
-    );
+    try {
+        await connection.promise().query(
+            'DELETE FROM users WHERE id = ?',
+            [id]
+        );
+
+        res.status(204).send();
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.listen(3000, () => {
-    console.log('Server running on port 3000');
+const PORT = process.env.APP_PORT || 3000;
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });

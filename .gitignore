@@ -1,0 +1,21 @@
+# Node.js
+app/node_modules/
+
+# Environment
+app/.env
+
+# Logs
+*.log
+logs/
+
+# Docker volume/data
+docker-data/
+mysql-data/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
