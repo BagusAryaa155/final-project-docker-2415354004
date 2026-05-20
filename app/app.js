@@ -1,107 +1,124 @@
+require('dotenv').config();
+
 const express = require('express');
 const mysql = require('mysql2');
-require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 
-const connection = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: process.env.APP_PORT,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-});
+const PORT = process.env.PORT || 3000;
 
-const initDatabase = () => {
-    connection.query('SELECT 1', (err) => {
-        if (err) {
-            console.log('Database belum ready, retry 3 detik lagi...', err.message);
-            setTimeout(initDatabase, 3000);
-            return;
-        }
-
-        console.log('Database connected');
-
-        connection.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL
-            )
-        `);
-    });
+const dbConfig = {
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 };
 
-initDatabase();
+let db;
 
+// Fungsi koneksi database dengan retry
+function connectDatabase() {
+  db = mysql.createConnection(dbConfig);
+
+  db.connect((err) => {
+    if (err) {
+      console.log('Waiting for MySQL...');
+      setTimeout(connectDatabase, 3000);
+    } else {
+      console.log('Connected to MySQL Database');
+
+      const createTable = `
+        CREATE TABLE IF NOT EXISTS users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(100),
+          email VARCHAR(100)
+        )
+      `;
+
+      db.query(createTable, (err) => {
+        if (err) {
+          console.log(err);
+        } else {
+          console.log('Users table ready');
+        }
+      });
+    }
+  });
+}
+
+connectDatabase();
+
+// Root Endpoint
 app.get('/', (req, res) => {
-    res.send('Backend API Running');
+  res.send('Docker Final Project Running');
 });
 
-app.get('/users', async (req, res) => {
-    try {
-        const result = await connection.promise().query('SELECT * FROM users');
-        res.json(result[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+// GET Users
+app.get('/users', (req, res) => {
+  db.query('SELECT * FROM users', (err, results) => {
+    if (err) {
+      return res.status(500).json(err);
     }
+
+    res.json(results);
+  });
 });
 
-app.post('/users', async (req, res) => {
-    const { name } = req.body;
+// POST User
+app.post('/users', (req, res) => {
+  const { name, email } = req.body;
 
-    try {
-        await connection.promise().query(
-            'INSERT INTO users (name) VALUES (?)',
-            [name]
-        );
+  const sql = 'INSERT INTO users (name, email) VALUES (?, ?)';
 
-        res.status(201).json({
-            message: 'User berhasil ditambahkan'
-        });
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  db.query(sql, [name, email], (err, result) => {
+    if (err) {
+      return res.status(500).json(err);
     }
+
+    res.json({
+      message: 'User added',
+      id: result.insertId,
+    });
+  });
 });
 
-app.put('/users/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name } = req.body;
+// PUT User
+app.put('/users/:id', (req, res) => {
+  const id = req.params.id;
+  const { name, email } = req.body;
 
-    try {
-        await connection.promise().query(
-            'UPDATE users SET name = ? WHERE id = ?',
-            [name, id]
-        );
+  const sql = 'UPDATE users SET name = ?, email = ? WHERE id = ?';
 
-        res.json({
-            message: 'User berhasil diupdate'
-        });
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  db.query(sql, [name, email, id], (err, result) => {
+    if (err) {
+      return res.status(500).json(err);
     }
+
+    res.json({
+      message: 'User updated',
+    });
+  });
 });
 
-app.delete('/users/:id', async (req, res) => {
-    const { id } = req.params;
+// DELETE User
+app.delete('/users/:id', (req, res) => {
+  const id = req.params.id;
 
-    try {
-        await connection.promise().query(
-            'DELETE FROM users WHERE id = ?',
-            [id]
-        );
+  const sql = 'DELETE FROM users WHERE id = ?';
 
-        res.status(204).send();
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      return res.status(500).json(err);
     }
+
+    res.json({
+      message: 'User deleted',
+    });
+  });
 });
 
-const PORT = process.env.APP_PORT || 3000;
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+// Run Server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
