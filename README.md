@@ -121,7 +121,7 @@ Request:
 
 ```json
 {
-  "name": "Govin",
+  "name": "Ryaa",
   "email": ""
 }
 ```
@@ -143,8 +143,8 @@ Response:
 [
   {
     "id": 1,
-    "name": "Pinn",
-    "email": "pinn@gmail.com"
+    "name": "Ryaa",
+    "email": "Gusryaa@gmail.com"
   }
 ]
 ```
