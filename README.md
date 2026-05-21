@@ -200,7 +200,7 @@ docker pull USERNAME_DOCKERHUB/project-app-backend:v1
 ```
 
 ```bash
-docker run -d -p 3000:3000 USERNAME_DOCKERHUB/project-app-backend:v1
+docker run -d -p 3001:3000 USERNAME_DOCKERHUB/project-app-backend:v1
 ```
 
 **Dokumentasi/Screenshot:**
